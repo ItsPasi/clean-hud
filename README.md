@@ -1,8 +1,9 @@
 <p align="center">
+    <img width="250" height="250" alt="Mod Icon 250px" src="https://github.com/user-attachments/assets/7d58d4fc-a002-47e2-89ea-07bc664b9f94" />
     <h1 align="center">Clean HUD</h1>
 </p>
 
-A small Fabric client HUD mod for Minecraft 26.1.2 using official Mojang deobfuscated names.
+A HUD mod that displays armor, effects and items in a vanilla like style.
 
 Features:
 - Armor Display
