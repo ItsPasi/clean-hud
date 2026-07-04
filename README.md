@@ -1,5 +1,5 @@
 <p align="center">
-    <img width="250" height="250" alt="Mod Icon 250px Round" src="https://github.com/user-attachments/assets/3e69fbac-ba2c-46c4-b45f-b3e105da40a5" />
+    <img width="250" height="250" alt="Mod Icon" src="https://github.com/user-attachments/assets/c9209740-0829-4de4-b32f-6ab31b7a0602" />
     <h1 align="center">Clean HUD</h1>
 </p>
 
