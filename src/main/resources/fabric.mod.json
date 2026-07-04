@@ -1,0 +1,45 @@
+{
+	"schemaVersion": 1,
+	"id": "clean-hud",
+	"version": "${version}",
+	"name": "Clean HUD",
+	"description": "A small HUD mod that displays compact armor, active effects with second timers, and a clock.",
+	"authors": [
+		"Me!"
+	],
+	"license": "CC0-1.0",
+	"icon": "assets/clean-hud/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"main": [
+			"com.cleanhud.CleanHUD"
+		],
+		"client": [
+			"com.cleanhud.CleanHUDClient"
+		],
+		"modmenu": [
+			"com.cleanhud.CleanHUDModMenu"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.2",
+		"minecraft": "~26.1.2",
+		"java": ">=25",
+		"fabric-api": "*",
+		"yet_another_config_lib_v3": ">=3.9.2"
+	},
+	"suggests": {
+		"modmenu": "*"
+	},
+	"custom": {
+		"modmenu": {
+			"update_checker": false
+		}
+	},
+	"mixins": [
+		{
+			"config": "clean-hud.mixins.json",
+			"environment": "client"
+		}
+	]
+}
