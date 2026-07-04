@@ -1,6 +1,5 @@
 package com.cleanhud;
 
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -17,6 +16,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -58,11 +58,11 @@ public class CleanHUDRenderer {
 
 	private static final Map<String, Integer> EFFECT_MAX_DURATIONS = new HashMap<>();
 
-	public static void render(GuiGraphicsExtractor graphics, DeltaTracker tickCounter) {
+	public static void render(GuiGraphicsExtractor graphics) {
 		Minecraft minecraft = Minecraft.getInstance();
 		LocalPlayer player = minecraft.player;
 
-		if (minecraft.options.hideGui || player == null) {
+		if (isGuiHidden(minecraft) || player == null) {
 			return;
 		}
 
@@ -165,18 +165,17 @@ public class CleanHUDRenderer {
 		}
 
 		int durabilityLeft = Math.max(0, maxDamage - stack.getDamageValue());
-		int barWidth = Math.max(0, Math.min(13, Math.round(13.0F * durabilityLeft / maxDamage)));
+		int barWidth = Math.clamp(Math.round(13.0F * durabilityLeft / maxDamage), 0, 13);
 
 		if (barWidth > 2) {
 			return false;
 		}
 
 		String text = Integer.toString(durabilityLeft);
-		int color = LOW_TEXT_COLOR;
-		int x = itemX + ITEM_SIZE - font.width(text) + 1;
+        int x = itemX + ITEM_SIZE - font.width(text) + 1;
 		int y = itemY + ITEM_SIZE - font.lineHeight + 2;
 
-		drawTextWithShadow(graphics, font, text, x, y, color);
+		drawTextWithShadow(graphics, font, text, x, y, LOW_TEXT_COLOR);
 		return true;
 	}
 
@@ -273,7 +272,7 @@ public class CleanHUDRenderer {
 			totalArrows += arrowStack.getCount();
 		}
 
-		ItemStack displayStack = arrowStacks.size() == 1 ? arrowStacks.get(0).copy() : new ItemStack(Items.ARROW);
+		ItemStack displayStack = arrowStacks.size() == 1 ? arrowStacks.getFirst().copy() : new ItemStack(Items.ARROW);
 		displayStack.setCount(totalArrows);
 
 		List<ItemStack> displayStacks = new ArrayList<>();
@@ -413,7 +412,7 @@ public class CleanHUDRenderer {
 		}
 
 		Identifier stackItemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
-		return stackItemId != null && stackItemId.toString().equals(itemId);
+		return stackItemId.toString().equals(itemId);
 	}
 
 	private static void renderEffects(GuiGraphicsExtractor graphics, Minecraft minecraft, LocalPlayer player, int hotbarRight, int hotbarY, boolean offhandOnRight, int guiWidth, int guiHeight, int arrowOffset) {
@@ -550,7 +549,7 @@ public class CleanHUDRenderer {
 		int barX = itemX + 2;
 		int barY = itemY + EFFECT_ICON_SIZE - 3;
 		int barMaxWidth = EFFECT_ICON_SIZE - 3;
-		int barWidth = Math.max(0, Math.min(barMaxWidth, Math.round((float) barMaxWidth * duration / maxDuration)));
+		int barWidth = Math.clamp(Math.round((float) barMaxWidth * duration / maxDuration), 0, barMaxWidth);
 		int red = Math.min(255, 255 - Math.round(255.0F * barWidth / barMaxWidth));
 		int green = Math.min(255, Math.round(255.0F * barWidth / barMaxWidth));
 		int color = 0xFF000000 | red << 16 | green << 8;
@@ -657,6 +656,34 @@ public class CleanHUDRenderer {
 		}
 
 		return null;
+	}
+
+	private static boolean isGuiHidden(Minecraft minecraft) {
+		Object options = minecraft.options;
+
+		for (String methodName : List.of("isGuiHidden", "isHudHidden", "hideGui", "hideHud", "shouldHideGui", "shouldHideHud")) {
+			try {
+				Method method = options.getClass().getDeclaredMethod(methodName);
+				method.setAccessible(true);
+				Object value = method.invoke(options);
+
+				if (value instanceof Boolean hidden) {
+					return hidden;
+				}
+			} catch (ReflectiveOperationException | RuntimeException ignored) {
+			}
+		}
+
+		for (String fieldName : List.of("hideGui", "hideHud", "hideHUD", "guiHidden", "hudHidden")) {
+			try {
+				Field field = options.getClass().getDeclaredField(fieldName);
+				field.setAccessible(true);
+				return field.getBoolean(options);
+			} catch (ReflectiveOperationException | RuntimeException ignored) {
+			}
+		}
+
+		return false;
 	}
 
 	private static boolean isDebugScreenOpen(Minecraft minecraft) {

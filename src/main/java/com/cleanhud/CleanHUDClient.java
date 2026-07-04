@@ -9,6 +9,6 @@ import net.minecraft.resources.Identifier;
 public class CleanHUDClient implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
-		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(CleanHUD.MOD_ID, "hud"), CleanHUDRenderer::render);
+		HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath(CleanHUD.MOD_ID, "hud"), (graphics, tickCounter) -> CleanHUDRenderer.render(graphics));
 	}
 }
