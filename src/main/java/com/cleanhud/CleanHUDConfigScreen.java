@@ -30,14 +30,13 @@ public class CleanHUDConfigScreen {
 				CleanHUDConfig.defaults().armorHudPosition
 		);
 
-		Option<Boolean> armorBackgroundOption = toggleOption(
-				"Armor HUD Background",
-				() -> CleanHUDConfig.INSTANCE.armorHudBackground,
+		Option<ArmorHudStyle> armorStyleOption = armorStyleOption(
+				() -> CleanHUDConfig.INSTANCE.armorHudStyle,
 				value -> {
-					CleanHUDConfig.INSTANCE.armorHudBackground = value;
+					CleanHUDConfig.INSTANCE.armorHudStyle = value;
 					presetState.markCustom();
 				},
-				CleanHUDConfig.defaults().armorHudBackground
+				CleanHUDConfig.defaults().armorHudStyle
 		);
 
 		Option<EffectHudPosition> effectPositionOption = effectPositionOption(
@@ -49,14 +48,13 @@ public class CleanHUDConfigScreen {
 				CleanHUDConfig.defaults().effectHudPosition
 		);
 
-		Option<Boolean> effectBackgroundOption = toggleOption(
-				"Effect HUD Background",
-				() -> CleanHUDConfig.INSTANCE.effectHudBackground,
+		Option<EffectHudStyle> effectStyleOption = effectStyleOption(
+				() -> CleanHUDConfig.INSTANCE.effectHudStyle,
 				value -> {
-					CleanHUDConfig.INSTANCE.effectHudBackground = value;
+					CleanHUDConfig.INSTANCE.effectHudStyle = value;
 					presetState.markCustom();
 				},
-				CleanHUDConfig.defaults().effectHudBackground
+				CleanHUDConfig.defaults().effectHudStyle
 		);
 
 		Option<ArrowDisplayMode> arrowDisplayOption = arrowDisplayModeOption(
@@ -132,9 +130,9 @@ public class CleanHUDConfigScreen {
 				selectedPreset,
 				presetState,
 				armorPositionOption,
-				armorBackgroundOption,
+				armorStyleOption,
 				effectPositionOption,
-				effectBackgroundOption
+				effectStyleOption
 		);
 
 		presetState.presetOption = presetOption;
@@ -145,9 +143,9 @@ public class CleanHUDConfigScreen {
 						.name(Component.literal("HUD"))
 						.option(presetOption)
 						.option(armorPositionOption)
-						.option(armorBackgroundOption)
+						.option(armorStyleOption)
 						.option(effectPositionOption)
-						.option(effectBackgroundOption)
+						.option(effectStyleOption)
 						.option(arrowDisplayOption)
 						.option(arrowRequireBowOption)
 						.option(separateArrowTypesOption)
@@ -165,9 +163,9 @@ public class CleanHUDConfigScreen {
 			CleanHUDPreset[] selectedPreset,
 			PresetState presetState,
 			Option<ArmorHudPosition> armorPositionOption,
-			Option<Boolean> armorBackgroundOption,
+			Option<ArmorHudStyle> armorStyleOption,
 			Option<EffectHudPosition> effectPositionOption,
-			Option<Boolean> effectBackgroundOption
+			Option<EffectHudStyle> effectStyleOption
 	) {
 		return Option.<CleanHUDPreset>createBuilder()
 				.name(Component.literal("Preset"))
@@ -185,22 +183,14 @@ public class CleanHUDConfigScreen {
 					try {
 						CleanHUDConfig.applyPreset(value);
 						armorPositionOption.requestSet(CleanHUDConfig.INSTANCE.armorHudPosition);
-						armorBackgroundOption.requestSet(CleanHUDConfig.INSTANCE.armorHudBackground);
+						armorStyleOption.requestSet(CleanHUDConfig.INSTANCE.armorHudStyle);
 						effectPositionOption.requestSet(CleanHUDConfig.INSTANCE.effectHudPosition);
-						effectBackgroundOption.requestSet(CleanHUDConfig.INSTANCE.effectHudBackground);
+						effectStyleOption.requestSet(CleanHUDConfig.INSTANCE.effectHudStyle);
 					} finally {
 						presetState.applyingPreset = false;
 					}
 				}))
 				.controller(option -> EnumControllerBuilder.create(option).enumClass(CleanHUDPreset.class).formatValue(CleanHUDConfigScreen::presetComponent))
-				.build();
-	}
-
-	private static Option<Boolean> toggleOption(String name, Supplier<Boolean> getter, Consumer<Boolean> setter, boolean defaultValue) {
-		return Option.<Boolean>createBuilder()
-				.name(Component.literal(name))
-				.stateManager(StateManager.createSimple(defaultValue, getter, setter))
-				.controller(TickBoxControllerBuilder::create)
 				.build();
 	}
 
@@ -230,11 +220,29 @@ public class CleanHUDConfigScreen {
 				.build();
 	}
 
+	private static Option<ArmorHudStyle> armorStyleOption(Supplier<ArmorHudStyle> getter, Consumer<ArmorHudStyle> setter, ArmorHudStyle defaultValue) {
+		return Option.<ArmorHudStyle>createBuilder()
+				.name(Component.literal("Armor HUD Background"))
+				.description(OptionDescription.of(armorStyleDescription()))
+				.stateManager(StateManager.createSimple(defaultValue, getter, setter))
+				.controller(option -> EnumControllerBuilder.create(option).enumClass(ArmorHudStyle.class).formatValue(CleanHUDConfigScreen::armorStyleComponent))
+				.build();
+	}
+
 	private static Option<EffectHudPosition> effectPositionOption(Supplier<EffectHudPosition> getter, Consumer<EffectHudPosition> setter, EffectHudPosition defaultValue) {
 		return Option.<EffectHudPosition>createBuilder()
 				.name(Component.literal("Effect HUD Position"))
 				.stateManager(StateManager.createSimple(defaultValue, getter, setter))
 				.controller(option -> EnumControllerBuilder.create(option).enumClass(EffectHudPosition.class).formatValue(CleanHUDConfigScreen::effectPositionComponent))
+				.build();
+	}
+
+	private static Option<EffectHudStyle> effectStyleOption(Supplier<EffectHudStyle> getter, Consumer<EffectHudStyle> setter, EffectHudStyle defaultValue) {
+		return Option.<EffectHudStyle>createBuilder()
+				.name(Component.literal("Effect HUD Background"))
+				.description(OptionDescription.of(effectStyleDescription()))
+				.stateManager(StateManager.createSimple(defaultValue, getter, setter))
+				.controller(option -> EnumControllerBuilder.create(option).enumClass(EffectHudStyle.class).formatValue(CleanHUDConfigScreen::effectStyleComponent))
 				.build();
 	}
 
@@ -265,6 +273,24 @@ public class CleanHUDConfigScreen {
 				.build();
 	}
 
+	private static Component armorStyleDescription() {
+		return Component.literal("")
+				.append(optionName("Hotbar"))
+				.append(Component.literal(" uses the connected hotbar texture.\n"))
+				.append(bold("Offhand"))
+				.append(Component.literal(" uses the old shield/offhand slot texture.\n"))
+				.append(offName())
+				.append(Component.literal(" hides the armor background."));
+	}
+
+	private static Component effectStyleDescription() {
+		return Component.literal("")
+				.append(bold("Offhand"))
+				.append(Component.literal(" uses the old shield/offhand slot texture.\n"))
+				.append(offName())
+				.append(Component.literal(" hides the effect background."));
+	}
+
 	private static Component presetDescription() {
 		return Component.literal("")
 				.append(bold("Hotbar"))
@@ -278,17 +304,23 @@ public class CleanHUDConfigScreen {
 				.append(optionName("Include Hotbar"))
 				.append(Component.literal(" counts all " + itemName + ".\n"))
 				.append(optionName("Exclude Hotbar"))
-				.append(Component.literal(" only counts " + itemName + " outside the hotbar.\n"));
+				.append(Component.literal(" only counts " + itemName + " outside the hotbar.\n"))
+				.append(offName())
+				.append(Component.literal(" hides the " + displayName + "."));
 	}
 
 	private static Component customItemDisplaysDescription() {
 		return Component.literal("Comma-separated item IDs to show beside the hotbar.\n\n")
 				.append(bold("Examples"))
-				.append(Component.literal(": minecraft:totem_of_undying, cobblestone"));
+				.append(Component.literal(": minecraft:totem_of_undying, cobblestone, modid:item_name"));
 	}
 
 	private static Component optionName(String text) {
 		return Component.literal(text).withStyle(ChatFormatting.GREEN).withStyle(ChatFormatting.BOLD);
+	}
+
+	private static Component offName() {
+		return Component.literal("Off").withStyle(ChatFormatting.RED).withStyle(ChatFormatting.BOLD);
 	}
 
 	private static Component bold(String text) {
@@ -314,6 +346,21 @@ public class CleanHUDConfigScreen {
 			case HOTBAR -> Component.literal("Hotbar").withStyle(ChatFormatting.WHITE);
 			case DYNAMIC -> Component.literal("Dynamic").withStyle(ChatFormatting.WHITE);
 			case CUSTOM -> Component.literal("Custom").withStyle(ChatFormatting.WHITE);
+		};
+	}
+
+	private static Component armorStyleComponent(ArmorHudStyle value) {
+		return switch (value) {
+			case HOTBAR -> Component.literal("Hotbar").withStyle(ChatFormatting.WHITE);
+			case OFFHAND -> Component.literal("Offhand").withStyle(ChatFormatting.WHITE);
+			case OFF -> Component.literal("Off").withStyle(ChatFormatting.RED);
+		};
+	}
+
+	private static Component effectStyleComponent(EffectHudStyle value) {
+		return switch (value) {
+			case OFFHAND -> Component.literal("Offhand").withStyle(ChatFormatting.WHITE);
+			case OFF -> Component.literal("Off").withStyle(ChatFormatting.RED);
 		};
 	}
 

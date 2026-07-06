@@ -1,18 +1,10 @@
 package com.cleanhud;
 
-import net.fabricmc.api.ModInitializer;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CleanHUD implements ModInitializer {
+public class CleanHUD {
 	public static final String MOD_ID = "clean-hud";
 
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
-
-	@Override
-	public void onInitialize() {
-		CleanHUDConfig.load();
-		LOGGER.info("Clean HUD initialized");
-	}
 }

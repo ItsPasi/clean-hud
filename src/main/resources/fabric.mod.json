@@ -11,9 +11,6 @@
 	"icon": "assets/clean-hud/icon.png",
 	"environment": "client",
 	"entrypoints": {
-		"main": [
-			"com.cleanhud.CleanHUD"
-		],
 		"client": [
 			"com.cleanhud.CleanHUDClient"
 		],

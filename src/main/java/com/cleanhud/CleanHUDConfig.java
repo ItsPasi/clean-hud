@@ -27,9 +27,9 @@ public class CleanHUDConfig {
 
 	public CleanHUDPreset preset = CleanHUDPreset.HOTBAR;
 	public ArmorHudPosition armorHudPosition = ArmorHudPosition.BOTTOM;
-	public boolean armorHudBackground = true;
+	public ArmorHudStyle armorHudStyle = ArmorHudStyle.HOTBAR;
 	public EffectHudPosition effectHudPosition = EffectHudPosition.BOTTOM;
-	public boolean effectHudBackground = true;
+	public EffectHudStyle effectHudStyle = EffectHudStyle.OFFHAND;
 	public ArrowDisplayMode arrowDisplayMode = ArrowDisplayMode.WITH_HOTBAR;
 	public boolean arrowRequireBow = true;
 	public boolean separateArrowTypes = false;
@@ -68,8 +68,16 @@ public class CleanHUDConfig {
 			INSTANCE.armorHudPosition = ArmorHudPosition.BOTTOM;
 		}
 
+		if (INSTANCE.armorHudStyle == null) {
+			INSTANCE.armorHudStyle = ArmorHudStyle.HOTBAR;
+		}
+
 		if (INSTANCE.effectHudPosition == null) {
 			INSTANCE.effectHudPosition = EffectHudPosition.BOTTOM;
+		}
+
+		if (INSTANCE.effectHudStyle == null) {
+			INSTANCE.effectHudStyle = EffectHudStyle.OFFHAND;
 		}
 
 		if (INSTANCE.customItemDisplays == null) {
@@ -101,15 +109,15 @@ public class CleanHUDConfig {
 		switch (preset) {
 			case HOTBAR -> {
 				INSTANCE.armorHudPosition = ArmorHudPosition.BOTTOM;
-				INSTANCE.armorHudBackground = true;
+				INSTANCE.armorHudStyle = ArmorHudStyle.HOTBAR;
 				INSTANCE.effectHudPosition = EffectHudPosition.BOTTOM;
-				INSTANCE.effectHudBackground = true;
+				INSTANCE.effectHudStyle = EffectHudStyle.OFFHAND;
 			}
 			case DYNAMIC -> {
 				INSTANCE.armorHudPosition = ArmorHudPosition.LEFT;
-				INSTANCE.armorHudBackground = true;
+				INSTANCE.armorHudStyle = ArmorHudStyle.OFFHAND;
 				INSTANCE.effectHudPosition = EffectHudPosition.TOP;
-				INSTANCE.effectHudBackground = false;
+				INSTANCE.effectHudStyle = EffectHudStyle.OFF;
 			}
 			case CUSTOM -> {
 			}

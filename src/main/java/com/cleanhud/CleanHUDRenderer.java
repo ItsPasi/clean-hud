@@ -20,17 +20,22 @@ import java.lang.reflect.Method;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class CleanHUDRenderer {
 	private static final int HOTBAR_WIDTH = 182;
 	private static final int HOTBAR_HEIGHT = 22;
 	private static final int HOTBAR_SIZE = 9;
+	private static final int HOTBAR_SLOT_ADVANCE = 20;
+	private static final int HOTBAR_SLOT_SIZE = 22;
+	private static final int HOTBAR_HALF_SLOT_WIDTH = HOTBAR_SLOT_SIZE / 2;
+	private static final int HOTBAR_ITEM_OFFSET = 3;
+	private static final int ARMOR_UI_GAP = 7;
+	private static final int ARMOR_HOTBAR_Y_OFFSET = 1;
 	private static final int ITEM_SIZE = 16;
 	private static final int EFFECT_ICON_SIZE = 18;
 	private static final int SIDE_SLOT_ADVANCE = 29;
@@ -48,6 +53,7 @@ public class CleanHUDRenderer {
 	private static final int TOP_EFFECT_ROW_ADVANCE = OFFHAND_BACKGROUND_HEIGHT + 11;
 	private static final int SCREEN_EDGE_PADDING = 2;
 
+	private static final Identifier HOTBAR_SPRITE = Identifier.withDefaultNamespace("hud/hotbar");
 	private static final Identifier HOTBAR_OFFHAND_LEFT_SPRITE = Identifier.withDefaultNamespace("hud/hotbar_offhand_left");
 	private static final Identifier HOTBAR_OFFHAND_RIGHT_SPRITE = Identifier.withDefaultNamespace("hud/hotbar_offhand_right");
 
@@ -56,7 +62,15 @@ public class CleanHUDRenderer {
 	private static final int SHADOW_COLOR = 0xAA000000;
 	private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
-	private static final Map<String, Integer> EFFECT_MAX_DURATIONS = new HashMap<>();
+	private static final Map<Object, Integer> EFFECT_MAX_DURATIONS = new HashMap<>();
+	private static final Map<Object, Identifier> EFFECT_ICONS = new HashMap<>();
+	private static final String[] GUI_HIDDEN_METHOD_NAMES = {"isGuiHidden", "isHudHidden", "hideGui", "hideHud", "shouldHideGui", "shouldHideHud"};
+	private static final String[] GUI_HIDDEN_FIELD_NAMES = {"hideGui", "hideHud", "hideHUD", "guiHidden", "hudHidden"};
+	private static Method guiHiddenMethod;
+	private static Field guiHiddenField;
+	private static boolean guiHiddenLookupDone;
+	private static Object bossOverlayCache;
+	private static Field bossBarMapFieldCache;
 
 	public static void render(GuiGraphicsExtractor graphics) {
 		Minecraft minecraft = Minecraft.getInstance();
@@ -121,31 +135,202 @@ public class CleanHUDRenderer {
 	}
 
 	private static void renderArmorBottom(GuiGraphicsExtractor graphics, Font font, List<ItemStack> armorStacks, int hotbarLeft, int hotbarY, boolean offhandOnLeft) {
+		ArmorHudStyle style = CleanHUDConfig.INSTANCE.armorHudStyle;
+
+		if (style == ArmorHudStyle.OFFHAND) {
+			renderArmorBottomOffhand(graphics, font, armorStacks, hotbarLeft, hotbarY, offhandOnLeft);
+			return;
+		}
+
+
+		int stripWidth = hotbarStripWidth(armorStacks.size());
+		int armorY = hotbarY + ARMOR_HOTBAR_Y_OFFSET;
+		int nextElementOffset = offhandOnLeft ? SIDE_SLOT_ADVANCE : 0;
+		int startSlotX = hotbarLeft - stripWidth - nextElementOffset - ARMOR_UI_GAP;
+
+		if (style == ArmorHudStyle.HOTBAR) {
+			drawHorizontalHotbarStrip(graphics, startSlotX, armorY, armorStacks.size());
+		}
+
+		for (int i = 0; i < armorStacks.size(); i++) {
+			drawArmorItem(graphics, font, armorStacks.get(i), startSlotX + HOTBAR_ITEM_OFFSET + i * HOTBAR_SLOT_ADVANCE, armorY + HOTBAR_ITEM_OFFSET);
+		}
+	}
+
+	private static void renderArmorBottomOffhand(GuiGraphicsExtractor graphics, Font font, List<ItemStack> armorStacks, int hotbarLeft, int hotbarY, boolean offhandOnLeft) {
 		int firstSlotX = hotbarLeft - OFFHAND_BACKGROUND_WIDTH - (offhandOnLeft ? SIDE_SLOT_ADVANCE : 0);
 		int startSlotX = firstSlotX - (armorStacks.size() - 1) * GROUP_SLOT_ADVANCE;
 
 		for (int i = 0; i < armorStacks.size(); i++) {
-			drawArmorSlot(graphics, font, armorStacks.get(i), startSlotX + i * GROUP_SLOT_ADVANCE, hotbarY);
+			drawArmorOffhandSlot(graphics, font, armorStacks.get(i), startSlotX + i * GROUP_SLOT_ADVANCE, hotbarY);
 		}
 	}
 
 	private static void renderArmorLeft(GuiGraphicsExtractor graphics, Font font, List<ItemStack> armorStacks, int guiHeight) {
+		ArmorHudStyle style = CleanHUDConfig.INSTANCE.armorHudStyle;
+
+		if (style == ArmorHudStyle.OFFHAND) {
+			renderArmorLeftOffhand(graphics, font, armorStacks, guiHeight);
+			return;
+		}
+
+
+		int columnHeight = hotbarStripWidth(armorStacks.size());
+		int startSlotY = guiHeight / 2 - columnHeight / 2;
+		int slotX = SCREEN_EDGE_PADDING - 2;
+
+		if (style == ArmorHudStyle.HOTBAR) {
+			drawVerticalHotbarStrip(graphics, slotX, startSlotY, armorStacks.size());
+		}
+
+		for (int i = 0; i < armorStacks.size(); i++) {
+			drawArmorItem(graphics, font, armorStacks.get(i), slotX + HOTBAR_ITEM_OFFSET, startSlotY + HOTBAR_ITEM_OFFSET + i * HOTBAR_SLOT_ADVANCE);
+		}
+	}
+
+	private static void renderArmorLeftOffhand(GuiGraphicsExtractor graphics, Font font, List<ItemStack> armorStacks, int guiHeight) {
 		int columnHeight = OFFHAND_BACKGROUND_HEIGHT + Math.max(0, armorStacks.size() - 1) * GROUP_SLOT_ADVANCE;
 		int startSlotY = guiHeight / 2 - columnHeight / 2;
 
 		for (int i = 0; i < armorStacks.size(); i++) {
-			drawArmorSlot(graphics, font, armorStacks.get(i), SCREEN_EDGE_PADDING, startSlotY + i * GROUP_SLOT_ADVANCE);
+			drawArmorOffhandSlot(graphics, font, armorStacks.get(i), SCREEN_EDGE_PADDING, startSlotY + i * GROUP_SLOT_ADVANCE);
 		}
 	}
 
-	private static void drawArmorSlot(GuiGraphicsExtractor graphics, Font font, ItemStack stack, int slotX, int slotY) {
+	private static void drawArmorOffhandSlot(GuiGraphicsExtractor graphics, Font font, ItemStack stack, int slotX, int slotY) {
 		int itemX = slotX + LEFT_OFFHAND_ITEM_OFFSET;
 		int itemY = slotY + OFFHAND_ITEM_Y_OFFSET;
 
-		if (CleanHUDConfig.INSTANCE.armorHudBackground) {
-			drawOffhandBackground(graphics, slotX, slotY, true);
+		drawOffhandBackground(graphics, slotX, slotY, true);
+		drawArmorItem(graphics, font, stack, itemX, itemY);
+	}
+
+	private static int hotbarStripWidth(int slots) {
+		return HOTBAR_HALF_SLOT_WIDTH * 2 + Math.max(0, slots - 1) * HOTBAR_SLOT_ADVANCE;
+	}
+
+	private static void drawHorizontalHotbarStrip(GuiGraphicsExtractor graphics, int x, int y, int slots) {
+		int stripWidth = hotbarStripWidth(slots);
+		int middleWidth = stripWidth - HOTBAR_HALF_SLOT_WIDTH * 2;
+
+		drawHotbarSlice(graphics, 0, x, y, HOTBAR_HALF_SLOT_WIDTH, HOTBAR_HEIGHT);
+
+		if (middleWidth > 0) {
+			drawHotbarSlice(graphics, HOTBAR_HALF_SLOT_WIDTH, x + HOTBAR_HALF_SLOT_WIDTH, y, middleWidth, HOTBAR_HEIGHT);
 		}
 
+		drawHotbarSlice(graphics, HOTBAR_WIDTH - HOTBAR_HALF_SLOT_WIDTH, x + stripWidth - HOTBAR_HALF_SLOT_WIDTH, y, HOTBAR_HALF_SLOT_WIDTH, HOTBAR_HEIGHT);
+	}
+
+	private static void drawVerticalHotbarStrip(GuiGraphicsExtractor graphics, int x, int y, int slots) {
+		if (drawRotatedHotbarStrip(graphics, x, y, slots)) {
+			return;
+		}
+
+		for (int i = 0; i < slots; i++) {
+			drawHotbarSlice(graphics, HOTBAR_WIDTH - HOTBAR_SLOT_SIZE, x, y + i * HOTBAR_SLOT_ADVANCE, HOTBAR_SLOT_SIZE, HOTBAR_SLOT_SIZE);
+		}
+	}
+
+	private static boolean drawRotatedHotbarStrip(GuiGraphicsExtractor graphics, int x, int y, int slots) {
+		Object pose = callNoArg(graphics);
+
+		if (pose == null || !invokeNoArg(pose, "pushMatrix", "pushPose", "push")) {
+			return false;
+		}
+
+		try {
+			if (!translatePose(pose, x + HOTBAR_HEIGHT, y) || !rotatePose(pose)) {
+				return false;
+			}
+
+			drawHorizontalHotbarStrip(graphics, 0, 0, slots);
+			return true;
+		} finally {
+			invokeNoArg(pose, "popMatrix", "popPose", "pop");
+		}
+	}
+
+	private static Object callNoArg(Object object) {
+		for (String name : new String[]{"pose"}) {
+			for (Method method : object.getClass().getMethods()) {
+				try {
+					if (method.getName().equals(name) && method.getParameterCount() == 0) {
+						method.setAccessible(true);
+						return method.invoke(object);
+					}
+				} catch (ReflectiveOperationException | RuntimeException ignored) {
+				}
+			}
+		}
+
+		return null;
+	}
+
+	private static boolean invokeNoArg(Object object, String... names) {
+		for (String name : names) {
+			for (Method method : object.getClass().getMethods()) {
+				try {
+					if (method.getName().equals(name) && method.getParameterCount() == 0) {
+						method.setAccessible(true);
+						method.invoke(object);
+						return true;
+					}
+				} catch (ReflectiveOperationException | RuntimeException ignored) {
+				}
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean translatePose(Object pose, int x, int y) {
+		for (Method method : pose.getClass().getMethods()) {
+			try {
+				if (!method.getName().equals("translate")) {
+					continue;
+				}
+
+				method.setAccessible(true);
+
+				if (method.getParameterCount() == 2) {
+					method.invoke(pose, (float) x, (float) y);
+					return true;
+				}
+
+				if (method.getParameterCount() == 3) {
+					method.invoke(pose, (double) x, (double) y, 0.0D);
+					return true;
+				}
+			} catch (ReflectiveOperationException | RuntimeException ignored) {
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean rotatePose(Object pose) {
+		for (Method method : pose.getClass().getMethods()) {
+			try {
+				if (!method.getName().equals("rotate") || method.getParameterCount() != 1) {
+					continue;
+				}
+
+				method.setAccessible(true);
+				method.invoke(pose, (float) Math.toRadians(90.0D));
+				return true;
+			} catch (ReflectiveOperationException | RuntimeException ignored) {
+			}
+		}
+
+		return false;
+	}
+
+	private static void drawHotbarSlice(GuiGraphicsExtractor graphics, int sourceX, int x, int y, int width, int height) {
+		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, HOTBAR_WIDTH, HOTBAR_HEIGHT, sourceX, 0, x, y, width, height);
+	}
+
+	private static void drawArmorItem(GuiGraphicsExtractor graphics, Font font, ItemStack stack, int itemX, int itemY) {
 		graphics.item(stack, itemX, itemY);
 
 		if (!drawLowDurabilityText(graphics, font, stack, itemX, itemY)) {
@@ -172,7 +357,7 @@ public class CleanHUDRenderer {
 		}
 
 		String text = Integer.toString(durabilityLeft);
-        int x = itemX + ITEM_SIZE - font.width(text) + 1;
+		int x = itemX + ITEM_SIZE - font.width(text) + 1;
 		int y = itemY + ITEM_SIZE - font.lineHeight + 2;
 
 		drawTextWithShadow(graphics, font, text, x, y, LOW_TEXT_COLOR);
@@ -416,9 +601,12 @@ public class CleanHUDRenderer {
 	}
 
 	private static void renderEffects(GuiGraphicsExtractor graphics, Minecraft minecraft, LocalPlayer player, int hotbarRight, int hotbarY, boolean offhandOnRight, int guiWidth, int guiHeight, int arrowOffset) {
-		List<MobEffectInstance> effects = player.getActiveEffects().stream()
-				.sorted(Comparator.comparingInt(CleanHUDRenderer::effectDurationForSorting))
-				.toList();
+		Collection<MobEffectInstance> effects = player.getActiveEffects();
+
+		if (effects.isEmpty()) {
+			EFFECT_MAX_DURATIONS.clear();
+			return;
+		}
 
 		if (CleanHUDConfig.INSTANCE.effectHudPosition == EffectHudPosition.TOP) {
 			renderEffectsTop(graphics, minecraft, effects, guiWidth, guiHeight);
@@ -427,12 +615,10 @@ public class CleanHUDRenderer {
 		}
 	}
 
-	private static void renderEffectsBottom(GuiGraphicsExtractor graphics, Font font, List<MobEffectInstance> effects, int hotbarRight, int hotbarY, boolean offhandOnRight, int guiWidth, int arrowOffset) {
+	private static void renderEffectsBottom(GuiGraphicsExtractor graphics, Font font, Collection<MobEffectInstance> effects, int hotbarRight, int hotbarY, boolean offhandOnRight, int guiWidth, int arrowOffset) {
 		int startSlotX = hotbarRight + (offhandOnRight ? SIDE_SLOT_ADVANCE : 0) + arrowOffset;
 		int slotX = startSlotX;
 		int row = 0;
-
-		EffectRenderState renderState = new EffectRenderState();
 
 		for (MobEffectInstance effect : effects) {
 			if (slotX + OFFHAND_BACKGROUND_WIDTH > guiWidth && slotX != startSlotX) {
@@ -440,68 +626,56 @@ public class CleanHUDRenderer {
 				row++;
 			}
 
-			drawEffectSlot(graphics, font, effect, slotX, hotbarY - row * EFFECT_ROW_ADVANCE, false, renderState);
+			drawEffectSlot(graphics, font, effect, slotX, hotbarY - row * EFFECT_ROW_ADVANCE, false);
 			slotX += GROUP_SLOT_ADVANCE;
 		}
-
-		finishEffectRendering(graphics, font, renderState);
 	}
 
-	private static void renderEffectsTop(GuiGraphicsExtractor graphics, Minecraft minecraft, List<MobEffectInstance> effects, int guiWidth, int guiHeight) {
-		if (effects.isEmpty()) {
-			return;
-		}
-
+	private static void renderEffectsTop(GuiGraphicsExtractor graphics, Minecraft minecraft, Collection<MobEffectInstance> effects, int guiWidth, int guiHeight) {
 		int maxSlotsPerRow = Math.max(1, (guiWidth - SCREEN_EDGE_PADDING * 2 - OFFHAND_BACKGROUND_WIDTH) / GROUP_SLOT_ADVANCE + 1);
 		int topSlotY = topEffectY(minecraft, guiHeight);
+		int totalEffects = effects.size();
 		int renderedSlots = 0;
+		int row = 0;
+		int rowSlot = 0;
+		int rowSlots = Math.min(maxSlotsPerRow, totalEffects);
+		int startSlotX = centeredRowStart(guiWidth, rowSlots);
 
-		EffectRenderState renderState = new EffectRenderState();
+		for (MobEffectInstance effect : effects) {
+			drawEffectSlot(graphics, minecraft.font, effect, startSlotX + rowSlot * GROUP_SLOT_ADVANCE, topSlotY + row * TOP_EFFECT_ROW_ADVANCE, true);
 
-		for (int row = 0; renderedSlots < effects.size(); row++) {
-			int rowSlots = Math.min(maxSlotsPerRow, effects.size() - renderedSlots);
-			int startSlotX = centeredRowStart(guiWidth, rowSlots);
-			int slotY = topSlotY + row * TOP_EFFECT_ROW_ADVANCE;
+			renderedSlots++;
+			rowSlot++;
 
-			for (int i = 0; i < rowSlots; i++) {
-				drawEffectSlot(graphics, minecraft.font, effects.get(renderedSlots), startSlotX + i * GROUP_SLOT_ADVANCE, slotY, true, renderState);
-				renderedSlots++;
+			if (rowSlot >= rowSlots && renderedSlots < totalEffects) {
+				row++;
+				rowSlot = 0;
+				rowSlots = Math.min(maxSlotsPerRow, totalEffects - renderedSlots);
+				startSlotX = centeredRowStart(guiWidth, rowSlots);
 			}
 		}
-
-		finishEffectRendering(graphics, minecraft.font, renderState);
 	}
 
-	private static void drawEffectSlot(GuiGraphicsExtractor graphics, Font font, MobEffectInstance effect, int slotX, int slotY, boolean topLayout, EffectRenderState renderState) {
+	private static void drawEffectSlot(GuiGraphicsExtractor graphics, Font font, MobEffectInstance effect, int slotX, int slotY, boolean topLayout) {
 		int itemX = slotX + EFFECT_ICON_X_OFFSET;
 		int itemY = slotY + EFFECT_ICON_Y_OFFSET;
-		String effectKey = effectBarKey(effect);
+		Object effectKey = effect.getEffect();
 
-		renderState.activeEffectKeys.add(effectKey);
+		drawEffectBackground(graphics, slotX, slotY);
 
-		if (CleanHUDConfig.INSTANCE.effectHudBackground) {
+		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, effectIcon(effect, effectKey), itemX, itemY, EFFECT_ICON_SIZE, EFFECT_ICON_SIZE);
+		drawEffectDurationBar(graphics, effect, effectKey, itemX, itemY);
+		drawEffectAmplifierText(graphics, font, effect, itemX, itemY);
+		drawEffectWarningText(graphics, font, effect, itemX, itemY, topLayout);
+	}
+
+	private static void drawEffectBackground(GuiGraphicsExtractor graphics, int slotX, int slotY) {
+		if (CleanHUDConfig.INSTANCE.effectHudStyle == EffectHudStyle.OFFHAND) {
 			drawOffhandBackground(graphics, slotX, slotY, false);
 		}
-
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, effectIcon(effect), itemX, itemY, EFFECT_ICON_SIZE, EFFECT_ICON_SIZE);
-		drawEffectDurationBar(graphics, effect, effectKey, itemX, itemY);
-		addEffectAmplifierText(font, effect, itemX, itemY, renderState.amplifierTexts);
-		addEffectWarningText(font, effect, itemX, itemY, topLayout, renderState.warningTexts);
 	}
 
-	private static void finishEffectRendering(GuiGraphicsExtractor graphics, Font font, EffectRenderState renderState) {
-		for (EffectText amplifierText : renderState.amplifierTexts) {
-			drawTextWithShadow(graphics, font, amplifierText.text, amplifierText.x, amplifierText.y, amplifierText.color);
-		}
-
-		for (EffectText warningText : renderState.warningTexts) {
-			drawTextWithShadow(graphics, font, warningText.text, warningText.x, warningText.y, warningText.color);
-		}
-
-		EFFECT_MAX_DURATIONS.keySet().removeIf(key -> !renderState.activeEffectKeys.contains(key));
-	}
-
-	private static void addEffectAmplifierText(Font font, MobEffectInstance effect, int itemX, int itemY, List<EffectText> amplifierTexts) {
+	private static void drawEffectAmplifierText(GuiGraphicsExtractor graphics, Font font, MobEffectInstance effect, int itemX, int itemY) {
 		if (effect.getAmplifier() <= 0) {
 			return;
 		}
@@ -510,10 +684,10 @@ public class CleanHUDRenderer {
 		int x = itemX + EFFECT_ICON_SIZE - font.width(text) + 1;
 		int y = itemY + EFFECT_ICON_SIZE - font.lineHeight + 2;
 
-		amplifierTexts.add(new EffectText(text, x, y, TEXT_COLOR));
+		drawTextWithShadow(graphics, font, text, x, y, TEXT_COLOR);
 	}
 
-	private static void addEffectWarningText(Font font, MobEffectInstance effect, int itemX, int itemY, boolean topLayout, List<EffectText> warningTexts) {
+	private static void drawEffectWarningText(GuiGraphicsExtractor graphics, Font font, MobEffectInstance effect, int itemX, int itemY, boolean topLayout) {
 		if (effect.isInfiniteDuration()) {
 			return;
 		}
@@ -529,10 +703,10 @@ public class CleanHUDRenderer {
 		int y = topLayout ? itemY + EFFECT_ICON_SIZE + 1 : Math.max(SCREEN_EDGE_PADDING, itemY - 12);
 		int color = seconds <= 3 ? LOW_TEXT_COLOR : TEXT_COLOR;
 
-		warningTexts.add(new EffectText(text, x, y, color));
+		drawTextWithShadow(graphics, font, text, x, y, color);
 	}
 
-	private static void drawEffectDurationBar(GuiGraphicsExtractor graphics, MobEffectInstance effect, String effectKey, int itemX, int itemY) {
+	private static void drawEffectDurationBar(GuiGraphicsExtractor graphics, MobEffectInstance effect, Object effectKey, int itemX, int itemY) {
 		if (effect.isInfiniteDuration()) {
 			return;
 		}
@@ -558,18 +732,19 @@ public class CleanHUDRenderer {
 		graphics.fill(barX, barY, barX + barWidth, barY + 1, color);
 	}
 
-	private static Identifier effectIcon(MobEffectInstance effect) {
-		return effect.getEffect().unwrapKey()
+	private static Identifier effectIcon(MobEffectInstance effect, Object effectKey) {
+		Identifier cachedIcon = EFFECT_ICONS.get(effectKey);
+
+		if (cachedIcon != null) {
+			return cachedIcon;
+		}
+
+		Identifier icon = effect.getEffect().unwrapKey()
 				.map(key -> key.identifier().withPrefix("mob_effect/"))
 				.orElse(Identifier.withDefaultNamespace("missingno"));
-	}
 
-	private static int effectDurationForSorting(MobEffectInstance effect) {
-		return effect.isInfiniteDuration() ? Integer.MAX_VALUE : effect.getDuration();
-	}
-
-	private static String effectBarKey(MobEffectInstance effect) {
-		return effectIcon(effect) + ":" + effect.getAmplifier();
+		EFFECT_ICONS.put(effectKey, icon);
+		return icon;
 	}
 
 	private static int effectSeconds(MobEffectInstance effect) {
@@ -603,10 +778,22 @@ public class CleanHUDRenderer {
 	}
 
 	private static int bossBarCount(Minecraft minecraft) {
-		Object bossOverlay = findBossOverlay(minecraft, 0);
+		Object bossOverlay = bossOverlayCache != null ? bossOverlayCache : findBossOverlay(minecraft, 0);
 
 		if (bossOverlay == null) {
 			return 0;
+		}
+
+		bossOverlayCache = bossOverlay;
+
+		if (bossBarMapFieldCache != null) {
+			Integer count = readBossBarCount(bossOverlay, bossBarMapFieldCache);
+
+			if (count != null) {
+				return count;
+			}
+
+			bossBarMapFieldCache = null;
 		}
 
 		for (Field field : bossOverlay.getClass().getDeclaredFields()) {
@@ -614,18 +801,30 @@ public class CleanHUDRenderer {
 				continue;
 			}
 
-			try {
-				field.setAccessible(true);
-				Object value = field.get(bossOverlay);
+			field.setAccessible(true);
 
-				if (value instanceof Map<?, ?> map) {
-					return map.size();
-				}
-			} catch (ReflectiveOperationException | RuntimeException ignored) {
+			Integer count = readBossBarCount(bossOverlay, field);
+
+			if (count != null) {
+				bossBarMapFieldCache = field;
+				return count;
 			}
 		}
 
 		return 0;
+	}
+
+	private static Integer readBossBarCount(Object bossOverlay, Field field) {
+		try {
+			Object value = field.get(bossOverlay);
+
+			if (value instanceof Map<?, ?> map) {
+				return map.size();
+			}
+		} catch (ReflectiveOperationException | RuntimeException ignored) {
+		}
+
+		return null;
 	}
 
 	private static Object findBossOverlay(Object object, int depth) {
@@ -661,29 +860,70 @@ public class CleanHUDRenderer {
 	private static boolean isGuiHidden(Minecraft minecraft) {
 		Object options = minecraft.options;
 
-		for (String methodName : List.of("isGuiHidden", "isHudHidden", "hideGui", "hideHud", "shouldHideGui", "shouldHideHud")) {
-			try {
-				Method method = options.getClass().getDeclaredMethod(methodName);
-				method.setAccessible(true);
-				Object value = method.invoke(options);
+		Boolean cachedValue = readCachedGuiHidden(options);
 
-				if (value instanceof Boolean hidden) {
-					return hidden;
-				}
-			} catch (ReflectiveOperationException | RuntimeException ignored) {
-			}
+		if (cachedValue != null) {
+			return cachedValue;
 		}
 
-		for (String fieldName : List.of("hideGui", "hideHud", "hideHUD", "guiHidden", "hudHidden")) {
-			try {
-				Field field = options.getClass().getDeclaredField(fieldName);
-				field.setAccessible(true);
-				return field.getBoolean(options);
-			} catch (ReflectiveOperationException | RuntimeException ignored) {
+		if (!guiHiddenLookupDone) {
+			cacheGuiHiddenAccessor(options);
+			cachedValue = readCachedGuiHidden(options);
+
+			if (cachedValue != null) {
+				return cachedValue;
 			}
 		}
 
 		return false;
+	}
+
+	private static Boolean readCachedGuiHidden(Object options) {
+		try {
+			if (guiHiddenMethod != null) {
+				Object value = guiHiddenMethod.invoke(options);
+
+				if (value instanceof Boolean hidden) {
+					return hidden;
+				}
+			}
+
+			if (guiHiddenField != null) {
+				return guiHiddenField.getBoolean(options);
+			}
+		} catch (ReflectiveOperationException | RuntimeException ignored) {
+			guiHiddenMethod = null;
+			guiHiddenField = null;
+			guiHiddenLookupDone = false;
+		}
+
+		return null;
+	}
+
+	private static void cacheGuiHiddenAccessor(Object options) {
+		for (String methodName : GUI_HIDDEN_METHOD_NAMES) {
+			try {
+				Method method = options.getClass().getDeclaredMethod(methodName);
+				method.setAccessible(true);
+				guiHiddenMethod = method;
+				guiHiddenLookupDone = true;
+				return;
+			} catch (ReflectiveOperationException | RuntimeException ignored) {
+			}
+		}
+
+		for (String fieldName : GUI_HIDDEN_FIELD_NAMES) {
+			try {
+				Field field = options.getClass().getDeclaredField(fieldName);
+				field.setAccessible(true);
+				guiHiddenField = field;
+				guiHiddenLookupDone = true;
+				return;
+			} catch (ReflectiveOperationException | RuntimeException ignored) {
+			}
+		}
+
+		guiHiddenLookupDone = true;
 	}
 
 	private static boolean isDebugScreenOpen(Minecraft minecraft) {
@@ -717,23 +957,4 @@ public class CleanHUDRenderer {
 		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, leftSide ? HOTBAR_OFFHAND_LEFT_SPRITE : HOTBAR_OFFHAND_RIGHT_SPRITE, x, y, OFFHAND_BACKGROUND_WIDTH, OFFHAND_BACKGROUND_HEIGHT);
 	}
 
-	private static class EffectRenderState {
-		private final Set<String> activeEffectKeys = new HashSet<>();
-		private final List<EffectText> amplifierTexts = new ArrayList<>();
-		private final List<EffectText> warningTexts = new ArrayList<>();
-	}
-
-	private static class EffectText {
-		private final String text;
-		private final int x;
-		private final int y;
-		private final int color;
-
-		private EffectText(String text, int x, int y, int color) {
-			this.text = text;
-			this.x = x;
-			this.y = y;
-			this.color = color;
-		}
-	}
 }
