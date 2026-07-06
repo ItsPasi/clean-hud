@@ -69,8 +69,11 @@ public class CleanHUDRenderer {
 	private static Method guiHiddenMethod;
 	private static Field guiHiddenField;
 	private static boolean guiHiddenLookupDone;
+	private static final long BOSS_BAR_LOOKUP_INTERVAL_MS = 500L;
 	private static Object bossOverlayCache;
 	private static Field bossBarMapFieldCache;
+	private static long lastBossBarLookupTime;
+	private static int cachedBossBarCount;
 
 	public static void render(GuiGraphicsExtractor graphics) {
 		Minecraft minecraft = Minecraft.getInstance();
@@ -632,6 +635,7 @@ public class CleanHUDRenderer {
 	}
 
 	private static void renderEffectsTop(GuiGraphicsExtractor graphics, Minecraft minecraft, Collection<MobEffectInstance> effects, int guiWidth, int guiHeight) {
+		Font font = minecraft.font;
 		int maxSlotsPerRow = Math.max(1, (guiWidth - SCREEN_EDGE_PADDING * 2 - OFFHAND_BACKGROUND_WIDTH) / GROUP_SLOT_ADVANCE + 1);
 		int topSlotY = topEffectY(minecraft, guiHeight);
 		int totalEffects = effects.size();
@@ -642,7 +646,7 @@ public class CleanHUDRenderer {
 		int startSlotX = centeredRowStart(guiWidth, rowSlots);
 
 		for (MobEffectInstance effect : effects) {
-			drawEffectSlot(graphics, minecraft.font, effect, startSlotX + rowSlot * GROUP_SLOT_ADVANCE, topSlotY + row * TOP_EFFECT_ROW_ADVANCE, true);
+			drawEffectSlot(graphics, font, effect, startSlotX + rowSlot * GROUP_SLOT_ADVANCE, topSlotY + row * TOP_EFFECT_ROW_ADVANCE, true);
 
 			renderedSlots++;
 			rowSlot++;
@@ -778,6 +782,18 @@ public class CleanHUDRenderer {
 	}
 
 	private static int bossBarCount(Minecraft minecraft) {
+		long now = System.currentTimeMillis();
+
+		if (now - lastBossBarLookupTime < BOSS_BAR_LOOKUP_INTERVAL_MS) {
+			return cachedBossBarCount;
+		}
+
+		lastBossBarLookupTime = now;
+		cachedBossBarCount = readBossBarCountNow(minecraft);
+		return cachedBossBarCount;
+	}
+
+	private static int readBossBarCountNow(Minecraft minecraft) {
 		Object bossOverlay = bossOverlayCache != null ? bossOverlayCache : findBossOverlay(minecraft, 0);
 
 		if (bossOverlay == null) {
