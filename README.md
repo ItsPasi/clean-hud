@@ -3,8 +3,8 @@
     <h1 align="center">Clean HUD</h1>
 </p>
 
-A HUD mod that displays armor, effects and items in a vanilla like style. Uses vanilla textures, so using resourcepacks will automatically adapt the appearance.
-You are able to adjust some postions, as well as the background of certain elements. The settings includes options like an adjustable arrow display and a custom item display.
+A HUD mod that displays armor, effects and an item counter in a vanilla like style. Uses vanilla textures, so using resourcepacks will automatically adapt the appearance.
+You are able to adjust positions, as well as the background of certain elements. The settings include options like an adjustable arrow display and a custom item display.
 
 <h1>Features</h1>
 
@@ -16,4 +16,4 @@ You are able to adjust some postions, as well as the background of certain eleme
 - Background Toggle
 
 <h1>Preview</h1>
-<img width="2560" height="1440" alt="Hotbar Preset" src="https://github.com/user-attachments/assets/175c4658-0b9a-4636-bca4-1c582c51f87e" />
+<img alt="Hotbar Preset" src="https://github.com/user-attachments/assets/175c4658-0b9a-4636-bca4-1c582c51f87e" />
