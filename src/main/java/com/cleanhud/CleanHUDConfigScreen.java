@@ -172,7 +172,7 @@ public class CleanHUDConfigScreen {
 				.description(OptionDescription.of(presetDescription()))
 				.stateManager(StateManager.createSimple(CleanHUDConfig.defaults().preset, () -> selectedPreset[0], value -> {
 
-                    selectedPreset[0] = value;
+					selectedPreset[0] = value;
 
 					if (value == CleanHUDPreset.CUSTOM) {
 						CleanHUDConfig.markCustomPreset();
@@ -205,7 +205,7 @@ public class CleanHUDConfigScreen {
 
 	private static Option<String> customItemDisplaysOption(Supplier<String> getter, Consumer<String> setter, String defaultValue) {
 		return Option.<String>createBuilder()
-				.name(Component.literal("Custom Item Displays"))
+				.name(Component.literal("Custom Item Display"))
 				.description(OptionDescription.of(customItemDisplaysDescription()))
 				.stateManager(StateManager.createSimple(defaultValue, getter, setter))
 				.controller(StringControllerBuilder::create)
@@ -275,18 +275,18 @@ public class CleanHUDConfigScreen {
 
 	private static Component armorStyleDescription() {
 		return Component.literal("")
-				.append(optionName("Hotbar"))
-				.append(Component.literal(" uses the connected hotbar texture.\n"))
-				.append(bold("Offhand"))
-				.append(Component.literal(" uses the old shield/offhand slot texture.\n"))
+				.append(yellowName("Hotbar"))
+				.append(Component.literal(" uses the hotbar texture.\n"))
+				.append(yellowName("Offhand"))
+				.append(Component.literal(" uses the offhand slot texture.\n"))
 				.append(offName())
 				.append(Component.literal(" hides the armor background."));
 	}
 
 	private static Component effectStyleDescription() {
 		return Component.literal("")
-				.append(bold("Offhand"))
-				.append(Component.literal(" uses the old shield/offhand slot texture.\n"))
+				.append(yellowName("Offhand"))
+				.append(Component.literal(" uses the offhand slot texture.\n"))
 				.append(offName())
 				.append(Component.literal(" hides the effect background."));
 	}
@@ -310,17 +310,25 @@ public class CleanHUDConfigScreen {
 	}
 
 	private static Component customItemDisplaysDescription() {
-		return Component.literal("Comma-separated item IDs to show beside the hotbar.\n\n")
-				.append(bold("Examples"))
-				.append(Component.literal(": minecraft:totem_of_undying, cobblestone, modid:item_name"));
+		return Component.literal("Items to show beside the hotbar.\n\n")
+				.append(bold("Example"))
+				.append(Component.literal(": minecraft:totem_of_undying, cobblestone"));
+	}
+
+	private static Component coloredName(String text, ChatFormatting color) {
+		return Component.literal(text).withStyle(color).withStyle(ChatFormatting.BOLD);
 	}
 
 	private static Component optionName(String text) {
-		return Component.literal(text).withStyle(ChatFormatting.GREEN).withStyle(ChatFormatting.BOLD);
+		return coloredName(text, ChatFormatting.GREEN);
+	}
+
+	private static Component yellowName(String text) {
+		return coloredName(text, ChatFormatting.YELLOW);
 	}
 
 	private static Component offName() {
-		return Component.literal("Off").withStyle(ChatFormatting.RED).withStyle(ChatFormatting.BOLD);
+		return coloredName("Off", ChatFormatting.RED);
 	}
 
 	private static Component bold(String text) {
@@ -351,15 +359,15 @@ public class CleanHUDConfigScreen {
 
 	private static Component armorStyleComponent(ArmorHudStyle value) {
 		return switch (value) {
-			case HOTBAR -> Component.literal("Hotbar").withStyle(ChatFormatting.WHITE);
-			case OFFHAND -> Component.literal("Offhand").withStyle(ChatFormatting.WHITE);
+			case HOTBAR -> Component.literal("Hotbar").withStyle(ChatFormatting.YELLOW);
+			case OFFHAND -> Component.literal("Offhand").withStyle(ChatFormatting.YELLOW);
 			case OFF -> Component.literal("Off").withStyle(ChatFormatting.RED);
 		};
 	}
 
 	private static Component effectStyleComponent(EffectHudStyle value) {
 		return switch (value) {
-			case OFFHAND -> Component.literal("Offhand").withStyle(ChatFormatting.WHITE);
+			case OFFHAND -> Component.literal("Offhand").withStyle(ChatFormatting.YELLOW);
 			case OFF -> Component.literal("Off").withStyle(ChatFormatting.RED);
 		};
 	}
