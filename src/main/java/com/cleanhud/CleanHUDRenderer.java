@@ -6,7 +6,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -74,6 +73,14 @@ public class CleanHUDRenderer {
 	private static Field bossBarMapFieldCache;
 	private static long lastBossBarLookupTime;
 	private static int cachedBossBarCount;
+
+	// Runtime-resolved GUI rendering compatibility for Minecraft 26.1-26.3.
+	// 26.3 changed the RenderPipeline class type while keeping the same API names,
+	// which makes direct field/method references from a 26.1-built jar binary-incompatible.
+	private static Object guiTexturedPipeline;
+	private static boolean guiTexturedPipelineLookupDone;
+	private static final Map<Class<?>, Method> BLIT_SPRITE_SLICE_METHODS = new HashMap<>();
+	private static final Map<Class<?>, Method> BLIT_SPRITE_METHODS = new HashMap<>();
 
 	public static void render(GuiGraphicsExtractor graphics) {
 		Minecraft minecraft = Minecraft.getInstance();
@@ -333,8 +340,93 @@ public class CleanHUDRenderer {
 		return false;
 	}
 
+	private static Object guiTexturedPipeline() {
+		if (guiTexturedPipelineLookupDone) {
+			return guiTexturedPipeline;
+		}
+
+		guiTexturedPipelineLookupDone = true;
+
+		try {
+			Class<?> renderPipelines = Class.forName("net.minecraft.client.renderer.RenderPipelines");
+			Field field = renderPipelines.getField("GUI_TEXTURED");
+			guiTexturedPipeline = field.get(null);
+		} catch (ReflectiveOperationException | RuntimeException exception) {
+			throw new IllegalStateException("Clean HUD could not resolve RenderPipelines.GUI_TEXTURED", exception);
+		}
+
+		return guiTexturedPipeline;
+	}
+
+	private static Method findBlitSpriteMethod(Class<?> graphicsClass, int parameterCount) {
+		Map<Class<?>, Method> cache = parameterCount == 10 ? BLIT_SPRITE_SLICE_METHODS : BLIT_SPRITE_METHODS;
+		Method cached = cache.get(graphicsClass);
+		if (cached != null) {
+			return cached;
+		}
+
+		for (Method method : graphicsClass.getMethods()) {
+			if (!method.getName().equals("blitSprite") || method.getParameterCount() != parameterCount) {
+				continue;
+			}
+
+			Class<?>[] parameterTypes = method.getParameterTypes();
+			if (parameterTypes.length < 2 || !parameterTypes[1].isAssignableFrom(Identifier.class)) {
+				continue;
+			}
+
+			Object pipeline = guiTexturedPipeline();
+			if (!parameterTypes[0].isInstance(pipeline)) {
+				continue;
+			}
+
+			method.setAccessible(true);
+			cache.put(graphicsClass, method);
+			return method;
+		}
+
+		throw new IllegalStateException("Clean HUD could not find compatible GuiGraphicsExtractor.blitSprite overload");
+	}
+
+	private static void blitSpriteCompat(GuiGraphicsExtractor graphics, Identifier sprite, int x, int y, int width, int height) {
+		try {
+			Method method = findBlitSpriteMethod(graphics.getClass(), 6);
+			method.invoke(graphics, guiTexturedPipeline(), sprite, x, y, width, height);
+		} catch (ReflectiveOperationException exception) {
+			throw new IllegalStateException("Clean HUD failed to draw GUI sprite", exception);
+		}
+	}
+
+	private static void blitSpriteCompat(
+			GuiGraphicsExtractor graphics,
+			int textureX,
+			int x,
+			int y,
+			int width,
+			int height
+	) {
+		try {
+			Method method = findBlitSpriteMethod(graphics.getClass(), 10);
+			method.invoke(
+					graphics,
+					guiTexturedPipeline(),
+					CleanHUDRenderer.HOTBAR_SPRITE,
+					CleanHUDRenderer.HOTBAR_WIDTH,
+					CleanHUDRenderer.HOTBAR_HEIGHT,
+					textureX,
+					0,
+					x,
+					y,
+					width,
+					height
+			);
+		} catch (ReflectiveOperationException exception) {
+			throw new IllegalStateException("Clean HUD failed to draw GUI sprite slice", exception);
+		}
+	}
+
 	private static void drawHotbarSlice(GuiGraphicsExtractor graphics, int sourceX, int x, int y, int width, int height) {
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, HOTBAR_SPRITE, HOTBAR_WIDTH, HOTBAR_HEIGHT, sourceX, 0, x, y, width, height);
+		blitSpriteCompat(graphics, sourceX, x, y, width, height);
 	}
 
 	private static void drawArmorItem(GuiGraphicsExtractor graphics, Font font, ItemStack stack, int itemX, int itemY) {
@@ -671,7 +763,7 @@ public class CleanHUDRenderer {
 
 		drawEffectBackground(graphics, slotX, slotY);
 
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, effectIcon(effect, effectKey), itemX, itemY, EFFECT_ICON_SIZE, EFFECT_ICON_SIZE);
+		blitSpriteCompat(graphics, effectIcon(effect, effectKey), itemX, itemY, EFFECT_ICON_SIZE, EFFECT_ICON_SIZE);
 		drawEffectDurationBar(graphics, effect, effectKey, itemX, itemY);
 		drawEffectAmplifierText(graphics, font, effect, itemX, itemY);
 		drawEffectWarningText(graphics, font, effect, itemX, itemY, topLayout);
@@ -974,7 +1066,7 @@ public class CleanHUDRenderer {
 	}
 
 	private static void drawOffhandBackground(GuiGraphicsExtractor graphics, int x, int y, boolean leftSide) {
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, leftSide ? HOTBAR_OFFHAND_LEFT_SPRITE : HOTBAR_OFFHAND_RIGHT_SPRITE, x, y, OFFHAND_BACKGROUND_WIDTH, OFFHAND_BACKGROUND_HEIGHT);
+		blitSpriteCompat(graphics, leftSide ? HOTBAR_OFFHAND_LEFT_SPRITE : HOTBAR_OFFHAND_RIGHT_SPRITE, x, y, OFFHAND_BACKGROUND_WIDTH, OFFHAND_BACKGROUND_HEIGHT);
 	}
 
 }
