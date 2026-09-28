@@ -3,7 +3,8 @@
 	"package": "com.cleanhud.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
-		"GuiMixin"
+		"GuiMixin",
+		"HudMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -121,6 +121,10 @@ public class CleanHUDRenderer {
 	private static void renderArmor(GuiGraphicsExtractor graphics, Font font, LocalPlayer player, int hotbarLeft, int hotbarY, boolean offhandOnLeft, int guiHeight) {
 		List<ItemStack> armorStacks = getArmorStacks(player);
 
+		if (armorStacks.isEmpty()) {
+			return;
+		}
+
 		if (CleanHUDConfig.INSTANCE.armorHudPosition == ArmorHudPosition.LEFT) {
 			renderArmorLeft(graphics, font, armorStacks, guiHeight);
 		} else {
