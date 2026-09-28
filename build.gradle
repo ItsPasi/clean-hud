@@ -24,20 +24,11 @@ repositories {
 	mavenCentral()
 }
 
-
 dependencies {
-	// To change the versions see the gradle.properties file
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-
-	// Fabric API. This is technically optional, but you probably want it anyway.
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
-
-	// Config UI
 	implementation "maven.modrinth:yacl:${project.yacl_version}"
-
-	// Optional config button in Mod Menu. The mod itself still runs without Mod Menu installed.
 	implementation "com.terraformersmc:modmenu:${project.modmenu_version}"
 }
 
@@ -55,9 +46,6 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 java {
-	// Loom will automatically attach sourcesJar to the "jar" task and to the "build" task
-	// if it is present.
-	// If you remove this line, sources will not be generated.
 	withSourcesJar()
 
 	sourceCompatibility = JavaVersion.VERSION_25
@@ -69,8 +57,12 @@ jar {
 	inputs.property "projectName", projectName
 
 	from("LICENSE") {
-		rename { "${it}_$projectName"}
+		rename { "${it}_${projectName}" }
 	}
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+	archiveVersion.set("${project.mod_version}+mc${project.minecraft_version_name}")
 }
 
 // configure the maven publication
@@ -81,11 +73,7 @@ publishing {
 		}
 	}
 
-	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
 	repositories {
 		// Add repositories to publish to here.
-		// Notice: This block does NOT have the same function as the block in the top level.
-		// The repositories here will be used for publishing your artifact, not for
-		// retrieving dependencies.
 	}
 }
